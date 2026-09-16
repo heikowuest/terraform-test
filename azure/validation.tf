@@ -31,6 +31,16 @@ resource "terraform_data" "validate_inputs" {
     }
 
     precondition {
+      condition     = var.availability_zone == "" || !local.is_ha
+      error_message = "availability_zone is currently supported for standalone and dsx deployments only; ha mode continues to use an availability set."
+    }
+
+    precondition {
+      condition     = var.availability_zone == "" || var.availability_set_name == ""
+      error_message = "availability_zone and availability_set_name are mutually exclusive."
+    }
+
+    precondition {
       condition = (
         !local.is_dsx_only
         || (length(trimspace(var.anvil_ip)) > 0 && !startswith(trimspace(var.anvil_ip), "<"))
