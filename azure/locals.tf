@@ -64,9 +64,9 @@ locals {
   # --- High-performance metadata/data disks + the availability-set rule ---
   # Azure forbids PremiumV2/Ultra disks on VMs in availability sets. The
   # standalone Anvil is NOT placed in a set (pointless for a single VM), so
-  # PremiumV2 metadata works there. HA Anvils and DSX nodes need the set for
-  # anti-affinity, so PremiumV2/Ultra requests FALL BACK transparently to
-  # Premium_LRS (a plan warning is raised via the check block in main.tf).
+  # PremiumV2/Ultra metadata works there. DSX nodes normally keep the existing
+  # availability-set behaviour, but when availability_zone is selected they
+  # are zonal instead and can use PremiumV2/Ultra directly.
   perf_disk_types = ["PremiumV2_LRS", "UltraSSD_LRS"]
 
   anvil_meta_requested    = var.anvil_metadata_disk_type == "Default" ? local.anvil_default_storage_type : var.anvil_metadata_disk_type
@@ -74,7 +74,7 @@ locals {
   anvil_meta_storage_type = local.anvil_meta_fallback ? "Premium_LRS" : local.anvil_meta_requested
 
   dsx_data_requested    = var.dsx_data_disk_type == "Default" ? local.dsx_default_storage_type : var.dsx_data_disk_type
-  dsx_data_fallback     = contains(local.perf_disk_types, local.dsx_data_requested)
+  dsx_data_fallback     = var.availability_zone == "" && contains(local.perf_disk_types, local.dsx_data_requested)
   dsx_data_storage_type = local.dsx_data_fallback ? "Premium_LRS" : local.dsx_data_requested
 
   # Prefix length of the data subnet CIDR - appended to the cluster/metadata
@@ -100,10 +100,14 @@ locals {
     : null
   )
 
+  # Zonal DSX VMs cannot also be members of an availability set.
+  # Empty availability_zone preserves the existing availability-set behaviour.
   dsx_avail_set_id = (
-    var.availability_set_name != ""
-    ? one(data.azurerm_availability_set.existing[*].id)
-    : one(azurerm_availability_set.dsx[*].id)
+    var.availability_zone != ""
+    ? null
+    : (var.availability_set_name != ""
+      ? one(data.azurerm_availability_set.existing[*].id)
+    : one(azurerm_availability_set.dsx[*].id))
   )
 
   nsg_id = var.network_security_group_id != "" ? var.network_security_group_id : one(azurerm_network_security_group.this[*].id)

@@ -4,8 +4,8 @@
 # like the AWS root: pre-flight -> NSG -> Anvil -> DSX -> tag.
 #
 # deployment_mode: standalone | ha | dsx.
-# No multi-az mode: the Azure reference design is an
-# availability set (fault domains) + internal load balancer.
+# HA uses availability sets; standalone / DSX deployments can
+# optionally use an Availability Zone via availability_zone.
 #
 # Dry run: `terraform plan` runs every input validation and the
 # pre-flight without creating anything.
@@ -78,8 +78,8 @@ module "preflight" {
 }
 
 # PremiumV2/Ultra disks cannot live on availability-set VMs - HA metadata and
-# DSX data disks fall back to Premium_LRS. Surfaced as a plan warning so the
-# fallback is never silent.
+# non-zonal DSX data disks fall back to Premium_LRS. Surfaced as a plan warning
+# so the fallback is never silent.
 check "perf_disk_fallback" {
   assert {
     condition     = !local.anvil_meta_fallback
@@ -200,7 +200,7 @@ resource "azurerm_availability_set" "anvil" {
 }
 
 resource "azurerm_availability_set" "dsx" {
-  count = var.dsx_count > 0 && var.availability_set_name == "" ? 1 : 0
+  count = var.dsx_count > 0 && var.availability_zone == "" && var.availability_set_name == "" ? 1 : 0
 
   name                         = "${local.prefix}DSXAvailSet"
   location                     = local.location
@@ -212,7 +212,7 @@ resource "azurerm_availability_set" "dsx" {
 }
 
 data "azurerm_availability_set" "existing" {
-  count = var.availability_set_name != "" ? 1 : 0
+  count = var.availability_set_name != "" && var.availability_zone == "" ? 1 : 0
 
   name                = var.availability_set_name
   resource_group_name = local.resource_group
@@ -240,6 +240,7 @@ module "anvil_standalone" {
   static_ip                = var.anvil_data_cluster_ip
   public_ip                = var.public_ip_addresses
   availability_set_id      = local.anvil_avail_set_id
+  availability_zone        = var.availability_zone
   ppg_id                   = local.ppg_id
   admin_username           = local.admin_username
   admin_password           = var.admin_password
@@ -311,6 +312,7 @@ module "dsx" {
   public_ip           = var.public_ip_addresses
   static_ips          = var.dsx_static_ips
   availability_set_id = local.dsx_avail_set_id
+  availability_zone   = var.availability_zone
   ppg_id              = local.ppg_id
   admin_username      = local.admin_username
   admin_password      = var.admin_password

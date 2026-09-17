@@ -31,6 +31,7 @@ resource "azurerm_virtual_machine" "this" {
   primary_network_interface_id     = var.nic_ids[0]
   vm_size                          = var.instance_type
   availability_set_id              = var.availability_set_id
+  zones                            = var.availability_zone != "" ? [var.availability_zone] : null
   proximity_placement_group_id     = var.ppg_id
   delete_os_disk_on_termination    = true
   delete_data_disks_on_termination = true
@@ -110,6 +111,7 @@ resource "azurerm_managed_disk" "perf" {
   storage_account_type = each.value.type
   create_option        = "Empty"
   disk_size_gb         = each.value.size
+  zone                 = var.availability_zone != "" ? var.availability_zone : null
   disk_iops_read_write = each.value.iops
   disk_mbps_read_write = each.value.throughput
   tags                 = var.tags

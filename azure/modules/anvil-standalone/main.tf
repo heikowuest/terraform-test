@@ -62,6 +62,7 @@ module "vm" {
   nic_ids             = [azurerm_network_interface.data.id]
   instance_type       = var.instance_type
   availability_set_id = var.availability_set_id
+  availability_zone   = var.availability_zone
   ppg_id              = var.ppg_id
   image_id            = var.image_id
   marketplace_image   = var.marketplace_image
